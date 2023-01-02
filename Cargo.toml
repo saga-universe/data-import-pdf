@@ -1,0 +1,12 @@
+[package]
+name = "rust"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pdf-extract = "0.6.4"
+lopdf = { version = "0.26", default-features = false, features = [ "pom_parser" ] }
+regex = "1.7.0"
+mysql = "*"

@@ -1,0 +1,24 @@
+version: '3'
+
+services:
+
+  rust:
+    image: rust:1.66
+    container_name: ${PROJECT_NAME}
+    hostname: rustup.${PROJECT_NAME}.local
+    domainname: ${PROJECT_NAME}.local
+    working_dir: /rust
+    user: "${UID}:${GID}"
+    tty: true
+    volumes:
+      - ${FOLDER_PATH}:/rust
+      - ${SAGA_FOLDER_PATH}:/saga-files
+    networks:
+      devEnvLocal:
+        aliases:
+          - rust.devEnv.local
+
+networks:
+  devEnvLocal:
+    driver: bridge
+    name: ${PROJECT_NAME}_devEnvLocal

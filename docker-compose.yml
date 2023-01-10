@@ -17,6 +17,54 @@ services:
       devEnvLocal:
         aliases:
           - rust.devEnv.local
+    environment:
+        DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mariadb:3306/${MYSQL_DATABASE}
+
+  mariadb:
+    image: mariadb:10.4
+    container_name: ${PROJECT_NAME}_mariadb
+    dns_search: devEnv.local
+    hostname: mariadb.devEnv.local
+    domainname: devEnv.local
+    restart: on-failure:2
+    # Check if Db is switch on
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-upublic", "-ppublic"]
+      interval: 120s
+      timeout: 1s
+      retries: 3
+    networks:
+      devEnvLocal:
+        aliases:
+          - mariadb.devEnv.local
+          - mariadb104.devEnv.local
+    volumes:
+      - ${MYSQL_FOLDER_PATH}:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3306:3306"
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    restart: always
+    links:
+      - mariadb
+    ports:
+      - 8080:80
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      PMA_HOST: mariadb
+      PMA_USER: ${MYSQL_USER}
+      PMA_PASSWORD: ${MYSQL_PASSWORD}
+    networks:
+      devEnvLocal:
+        aliases:
+          - pma.devEnv.local
+
 
 networks:
   devEnvLocal:

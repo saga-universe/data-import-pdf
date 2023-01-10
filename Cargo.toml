@@ -9,4 +9,7 @@ edition = "2021"
 pdf-extract = "0.6.4"
 lopdf = { version = "0.26", default-features = false, features = [ "pom_parser" ] }
 regex = "1.7.0"
-mysql = "*"
+diesel = { version = "2.0.0", features = ["mysql", "chrono"] }
+serde_json = "1.0.68"
+serde = { version = "1.0.130", features = ["derive"] }
+chrono = { version = "0.4.3", features = ["serde"] }

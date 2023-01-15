@@ -1,4 +1,4 @@
-use diesel::{Insertable, MysqlConnection, QueryDsl, Queryable, insert_into, RunQueryDsl};
+use diesel::{insert_into, Insertable, MysqlConnection, QueryDsl, Queryable, RunQueryDsl};
 use serde::Deserialize;
 
 use crate::schema::subcategories;
@@ -104,7 +104,6 @@ pub const LIST_OF_SUBCATEGORY: [NewSubcategories; 56] = [
 ];
 
 impl Subcategory {
-
     pub fn clean_subcategory_list(value: &str) -> Subcategory {
         match value {
             "Sérieuse" | "Sérieux" => Subcategory {
@@ -289,22 +288,30 @@ impl Subcategory {
         }
     }
 
-    pub fn find_subcategory_in_array(list_of_subcategory: &Vec<FullSubcategory>, value: &str) -> String {
+    pub fn find_subcategory_in_array(
+        list_of_subcategory: &Vec<FullSubcategory>,
+        value: &str,
+    ) -> String {
         let subcategory = list_of_subcategory.iter().find(|x| x.name == value);
         match subcategory {
             Some(subcategory_info) => String::from(subcategory_info.id.to_string()),
             None => {
-                panic!("This category {:#?}  doesn't exist in db : {:#?}", value,value);
+                panic!(
+                    "This category {:#?}  doesn't exist in db : {:#?}",
+                    value, value
+                );
             }
         }
     }
 
     pub fn create<'a>(conn: &mut MysqlConnection, records: [NewSubcategories<'a>; 56]) {
         use crate::schema::subcategories::dsl::*;
-        let record_inserted = insert_into(subcategories).values::<Vec<NewSubcategories<'a>>>(records.to_vec()).execute(conn);
+        let record_inserted = insert_into(subcategories)
+            .values::<Vec<NewSubcategories<'a>>>(records.to_vec())
+            .execute(conn);
         match record_inserted {
-            Ok(_)=>{}
-            Err(err)=>{
+            Ok(_) => {}
+            Err(err) => {
                 panic!("Error during insertion: {:#?}", err)
             }
         }
@@ -312,14 +319,14 @@ impl Subcategory {
 
     pub fn find(conn: &mut MysqlConnection) -> Vec<FullSubcategory> {
         use crate::schema::subcategories::dsl::*;
-        match subcategories.select((id,name)).load::<FullSubcategory>(conn) {
-            Ok(categories_list) => {
-                categories_list
-            },
+        match subcategories
+            .select((id, name))
+            .load::<FullSubcategory>(conn)
+        {
+            Ok(categories_list) => categories_list,
             Err(_) => {
                 panic!("No subcategory found in database");
             }
         }
     }
-
 }

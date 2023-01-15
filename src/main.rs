@@ -21,10 +21,10 @@ use crate::data::country;
 use crate::data::country::Country;
 use crate::data::country::FullCountry;
 use crate::data::sagas_subcategories::SagasSubcategories;
-use crate::data::sub_categories::FullSubcategory;
-use crate::data::sub_categories::LIST_OF_SUBCATEGORY;
-use crate::data::sub_categories::Subcategory;
 use crate::data::status::FullStatus;
+use crate::data::sub_categories::FullSubcategory;
+use crate::data::sub_categories::Subcategory;
+use crate::data::sub_categories::LIST_OF_SUBCATEGORY;
 use crate::data::{status::Status, status::LIST_OF_STATUS};
 use crate::schema::sagas::categoryID;
 use data::{category::Category, country::LIST_OF_COUNTRY, saga::Saga};
@@ -57,10 +57,10 @@ fn main() {
     Country::create(&mut conn, LIST_OF_COUNTRY);
     list_of_country = Country::find(&mut conn);
 
-    Category::create(&mut conn,LIST_OF_CATEGORY);
+    Category::create(&mut conn, LIST_OF_CATEGORY);
     list_of_category = Category::find(&mut conn);
 
-    Subcategory::create(&mut conn,LIST_OF_SUBCATEGORY);
+    Subcategory::create(&mut conn, LIST_OF_SUBCATEGORY);
     list_of_subcategory = Subcategory::find(&mut conn);
 
     for path in paths {
@@ -93,15 +93,12 @@ fn main() {
                     }
                 }
             }
-            
+
             if pdf_data.contains_key("Origine") {
                 match pdf_data.get("Origine") {
                     None => {}
                     Some(country) => {
-                        let country_key = Country::find_country_in_array(
-                            &list_of_country,
-                            country,
-                        );
+                        let country_key = Country::find_country_in_array(&list_of_country, country);
                         pdf_data.insert("Origine".to_string(), country_key);
                     }
                 }
@@ -141,21 +138,20 @@ fn main() {
                     let new_saga = create_saga(&pdf_data, name);
                     saga.push(new_saga.clone());
                     let saga_id = Saga::create(&mut conn, new_saga);
-                    
 
                     match pdf_data.get("Style") {
-                        Some(subcategory) => {
-                            match subcategory.parse::<u32>() {
-                                Ok(id) => {
-                                    let new_saga_subcategory = SagasSubcategories{sagaID: saga_id, subcategoryID: id};
-                                    SagasSubcategories::create(&mut conn, new_saga_subcategory)
-                                },
-                                Err(e) => panic!("No id found for country: {:#?}", e),
-                            }                            
-                        }
+                        Some(subcategory) => match subcategory.parse::<u32>() {
+                            Ok(id) => {
+                                let new_saga_subcategory = SagasSubcategories {
+                                    sagaID: saga_id,
+                                    subcategoryID: id,
+                                };
+                                SagasSubcategories::create(&mut conn, new_saga_subcategory)
+                            }
+                            Err(e) => panic!("No id found for country: {:#?}", e),
+                        },
                         None => {}
                     }
-                    
                 }
                 Err(_) => {}
             }
@@ -207,7 +203,6 @@ fn find_data_in_text_string(data: String, file: String) -> HashMap<String, Strin
 
     saga_info
 }
-
 
 fn create_saga(data_array: &HashMap<String, String>, name: String) -> NewSaga {
     let mut saga: NewSaga = NewSaga::default();

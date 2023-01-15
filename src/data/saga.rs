@@ -1,8 +1,11 @@
-use chrono::NaiveDateTime;
-use diesel::{Insertable, MysqlConnection, insert_into, RunQueryDsl, Queryable, sql_query, QueryableByName, QueryDsl, sql_types::Integer};
-use serde::Deserialize;
 use crate::schema::sagas;
+use chrono::NaiveDateTime;
 use diesel::ExpressionMethods;
+use diesel::{
+    insert_into, sql_query, sql_types::Integer, Insertable, MysqlConnection, QueryDsl, Queryable,
+    QueryableByName, RunQueryDsl,
+};
+use serde::Deserialize;
 
 #[derive(Debug, QueryableByName, Deserialize)]
 #[diesel(table_name = sagas)]
@@ -14,14 +17,14 @@ pub struct Saga {
     pub name: String,
     pub author: String,
     pub music: String,
-    pub season: u16, //total of season
-    pub creation_date: String,//Date,
-    pub countryID: u32,//Id of Country,
-    pub statusID: u32,//Id of Status
-    pub categoryID: u32,//Id of category
+    pub season: u16,           //total of season
+    pub creation_date: String, //Date,
+    pub countryID: u32,        //Id of Country,
+    pub statusID: u32,         //Id of Status
+    pub categoryID: u32,       //Id of category
     pub description: String,
     pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime
+    pub updated_at: NaiveDateTime,
 }
 
 #[derive(Debug, Deserialize, Clone, Insertable)]
@@ -30,17 +33,17 @@ pub struct NewSaga {
     pub name: String,
     pub author: String,
     pub music: String,
-    pub countryID: u32,//Id of Country,
-    pub categoryID: u32,//Id of category
-    pub statusID: u32,//Id of Status
-    pub creation_date: String,//Date,
-    pub season: u16, //total of season
+    pub countryID: u32,        //Id of Country,
+    pub categoryID: u32,       //Id of category
+    pub statusID: u32,         //Id of Status
+    pub creation_date: String, //Date,
+    pub season: u16,           //total of season
     pub description: String,
 }
 
 impl Default for NewSaga {
     fn default() -> Self {
-        Self { 
+        Self {
             name: "".to_string(),
             author: "".to_string(),
             music: "".to_string(),
@@ -55,24 +58,25 @@ impl Default for NewSaga {
 }
 
 impl Saga {
-
     pub fn create<'a>(conn: &mut MysqlConnection, newSaga: NewSaga) -> u32 {
         use crate::schema::sagas::dsl::*;
         let saga_name = newSaga.name.clone();
         let record_inserted = insert_into(sagas).values::<NewSaga>(newSaga).execute(conn);
 
         match record_inserted {
-            Ok(_)=>{
-                match sagas.filter(name.eq(saga_name)).select(id).first::<u32>(conn){
-                    Ok(info)=>{
-                        info
-                    }
-                    Err(err)=>{
+            Ok(_) => {
+                match sagas
+                    .filter(name.eq(saga_name))
+                    .select(id)
+                    .first::<u32>(conn)
+                {
+                    Ok(info) => info,
+                    Err(err) => {
                         panic!("Error during insertion: {:#?}", err);
                     }
                 }
             }
-            Err(err)=>{
+            Err(err) => {
                 panic!("Error during insertion: {:#?}", err);
             }
         }

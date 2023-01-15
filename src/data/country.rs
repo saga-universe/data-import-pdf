@@ -1052,9 +1052,7 @@ impl Country<'_> {
 
         match country {
             Some(country_info) => String::from(country_info.id.to_string()),
-            None => {
-                String::from("250".to_string())
-            }
+            None => String::from("250".to_string()),
         }
     }
 }

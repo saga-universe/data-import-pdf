@@ -1,4 +1,4 @@
-use diesel::{insert_into, mysql::Mysql, debug_query};
+use diesel::{debug_query, insert_into, mysql::Mysql};
 
 use crate::data::status::NewStatus;
 
@@ -69,7 +69,6 @@ fn it_shouldnt_find_the_synopsis_detail_nothing_come_after_the_key() {
     assert_eq!("", find_synopsis(&text));
 }
 
-
 #[test]
 fn it_should_find_status_in_array() {
     let array_status: Vec<FullStatus> = vec![
@@ -83,7 +82,10 @@ fn it_should_find_status_in_array() {
         },
     ];
 
-    assert_eq!("1", Status::find_status_in_array(&array_status, "Abandonnée"));
+    assert_eq!(
+        "1",
+        Status::find_status_in_array(&array_status, "Abandonnée")
+    );
 }
 
 #[test]
@@ -91,22 +93,16 @@ fn examine_sql_from_insertable_status_struct_batch() {
     use schema::status::dsl::*;
     let status_array: [NewStatus; 5] = [
         NewStatus {
-            name: "Abandonnée",
+            name: "Abandonnée"
         },
-        NewStatus {
-            name: "Terminée",
-        },
-        NewStatus {
-            name: "En cours",
-        },
+        NewStatus { name: "Terminée" },
+        NewStatus { name: "En cours" },
         NewStatus {
             name: "Pris de cours",
         },
-        NewStatus {
-            name: "Jadis",
-        },
+        NewStatus { name: "Jadis" },
     ];
-    
+
     let query = insert_into(status).values(&status_array);
     let sql = "INSERT INTO `status` (`name`) \
                VALUES (?), (?), (?), (?), (?) \

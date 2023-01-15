@@ -1,4 +1,4 @@
-use diesel::{Insertable, MysqlConnection, insert_into, QueryDsl, RunQueryDsl, Queryable};
+use diesel::{insert_into, Insertable, MysqlConnection, QueryDsl, Queryable, RunQueryDsl};
 use serde::Deserialize;
 
 use crate::schema::categories;
@@ -183,7 +183,6 @@ pub const LIST_OF_CATEGORY: [NewCategory; 90] = [
 ];
 
 impl Category {
-    
     pub fn clean_category_list(value: &str) -> Category {
         match value {
             "Mono" | "Mono mp3" | "Monos mp3" | "MONO mp3" => Category {
@@ -495,17 +494,22 @@ impl Category {
         match category {
             Some(category_info) => String::from(category_info.id.to_string()),
             None => {
-                panic!("This category {:#?}  doesn't exist in db : {:#?}", value,value);
+                panic!(
+                    "This category {:#?}  doesn't exist in db : {:#?}",
+                    value, value
+                );
             }
         }
     }
 
     pub fn create<'a>(conn: &mut MysqlConnection, records: [NewCategory<'a>; 90]) {
         use crate::schema::categories::dsl::*;
-        let record_inserted = insert_into(categories).values::<Vec<NewCategory<'a>>>(records.to_vec()).execute(conn);
+        let record_inserted = insert_into(categories)
+            .values::<Vec<NewCategory<'a>>>(records.to_vec())
+            .execute(conn);
         match record_inserted {
-            Ok(_)=>{}
-            Err(err)=>{
+            Ok(_) => {}
+            Err(err) => {
                 panic!("Error during insertion: {:#?}", err)
             }
         }
@@ -513,10 +517,8 @@ impl Category {
 
     pub fn find(conn: &mut MysqlConnection) -> Vec<FullCategory> {
         use crate::schema::categories::dsl::*;
-        match categories.select((id,name)).load::<FullCategory>(conn) {
-            Ok(categories_list) => {
-                categories_list
-            },
+        match categories.select((id, name)).load::<FullCategory>(conn) {
+            Ok(categories_list) => categories_list,
             Err(_) => {
                 panic!("No status found in database");
             }

@@ -1,18 +1,32 @@
 extern crate lopdf;
 extern crate pdf_extract;
 
+use core::panic;
+use data::saga::NewSaga;
+use data::status;
 use pdf_extract::*;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::path;
 use std::path::PathBuf;
 
 mod data;
+mod db;
+mod schema;
 mod test;
 
-use crate::data::saga_style::Saga_Style;
-use crate::data::status::Status;
+use crate::data::category::FullCategory;
+use crate::data::category::LIST_OF_CATEGORY;
+use crate::data::country;
+use crate::data::country::Country;
+use crate::data::country::FullCountry;
+use crate::data::sagas_subcategories::SagasSubcategories;
+use crate::data::sub_categories::FullSubcategory;
+use crate::data::sub_categories::LIST_OF_SUBCATEGORY;
+use crate::data::sub_categories::Subcategory;
+use crate::data::status::FullStatus;
+use crate::data::{status::Status, status::LIST_OF_STATUS};
+use crate::schema::sagas::categoryID;
 use data::{category::Category, country::LIST_OF_COUNTRY, saga::Saga};
 
 const WANTED_KEYS: [&str; 9] = [
@@ -29,9 +43,29 @@ const WANTED_KEYS: [&str; 9] = [
 
 fn main() {
     let paths = fs::read_dir("/saga-files/").unwrap();
+    let mut data_array: Vec<HashMap<String, String>> = vec![];
+    let mut list_of_status: Vec<FullStatus> = vec![];
+    let mut list_of_category: Vec<FullCategory> = vec![];
+    let mut list_of_subcategory: Vec<FullSubcategory> = vec![];
+    let mut list_of_country: Vec<FullCountry> = vec![];
+
+    let mut saga: Vec<NewSaga> = vec![];
+    let mut conn = db::connect();
+    Status::create(&mut conn, LIST_OF_STATUS);
+    list_of_status = Status::find(&mut conn);
+
+    Country::create(&mut conn, LIST_OF_COUNTRY);
+    list_of_country = Country::find(&mut conn);
+
+    Category::create(&mut conn,LIST_OF_CATEGORY);
+    list_of_category = Category::find(&mut conn);
+
+    Subcategory::create(&mut conn,LIST_OF_SUBCATEGORY);
+    list_of_subcategory = Subcategory::find(&mut conn);
+
     for path in paths {
-        
         let file = path.as_ref().unwrap().file_name().into_string();
+        let mut name = "".to_string();
         let output_kind = env::args().nth(2).unwrap_or_else(|| "txt".to_owned());
         let path_name = path.unwrap().path();
         let filename = path_name.file_name().expect("expected a filename");
@@ -41,72 +75,125 @@ fn main() {
 
         let info = extract_text(path_name);
 
-        if let Ok(val) = info {
-            let mut name = "".to_string();
+        if let Ok(mut val) = info {
+            // Isolate wanted info by adding a $ at its beginning
+            val = find_wanted_key_in_text(val);
+            val = cleanup_values(&val, "\u{a0}".to_string(), "");
+            val = cleanup_values(&val, "\n\n".to_string(), "$");
+            val = cleanup_values(&val, "\n".to_string(), " ");
+            let mut pdf_data = find_data_in_text_string(val, name);
+            if pdf_data.contains_key("Statut") {
+                match pdf_data.get("Statut") {
+                    None => {}
+                    Some(status) => {
+                        let cleaned_status = Status::clean_status_list(&status);
+                        let status_key =
+                            Status::find_status_in_array(&list_of_status, &cleaned_status.name);
+                        pdf_data.insert("Statut".to_string(), status_key);
+                    }
+                }
+            }
+            
+            if pdf_data.contains_key("Origine") {
+                match pdf_data.get("Origine") {
+                    None => {}
+                    Some(country) => {
+                        let country_key = Country::find_country_in_array(
+                            &list_of_country,
+                            country,
+                        );
+                        pdf_data.insert("Origine".to_string(), country_key);
+                    }
+                }
+            }
+
+            if pdf_data.contains_key("Genre") {
+                match pdf_data.get("Genre") {
+                    None => {}
+                    Some(category) => {
+                        let cleaned_category = Category::clean_category_list(&category);
+                        let category_key = Category::find_category_in_array(
+                            &list_of_category,
+                            &cleaned_category.name,
+                        );
+                        pdf_data.insert("Genre".to_string(), category_key);
+                    }
+                }
+            }
+
+            if pdf_data.contains_key("Style") {
+                match pdf_data.get("Style") {
+                    None => {}
+                    Some(category) => {
+                        let cleaned_subcategory = Subcategory::clean_subcategory_list(&category);
+                        let subcategory_key = Subcategory::find_subcategory_in_array(
+                            &list_of_subcategory,
+                            &cleaned_subcategory.name,
+                        );
+                        pdf_data.insert("Style".to_string(), subcategory_key);
+                    }
+                }
+            }
             match file {
                 Ok(filename) => {
                     name = filename.to_string();
-                }
-                Err(_) => {
+                    name = cleanup_values(&name, ".pdf".to_string(), "");
+                    let new_saga = create_saga(&pdf_data, name);
+                    saga.push(new_saga.clone());
+                    let saga_id = Saga::create(&mut conn, new_saga);
+                    
 
+                    match pdf_data.get("Style") {
+                        Some(subcategory) => {
+                            match subcategory.parse::<u32>() {
+                                Ok(id) => {
+                                    let new_saga_subcategory = SagasSubcategories{sagaID: saga_id, subcategoryID: id};
+                                    SagasSubcategories::create(&mut conn, new_saga_subcategory)
+                                },
+                                Err(e) => panic!("No id found for country: {:#?}", e),
+                            }                            
+                        }
+                        None => {}
+                    }
+                    
                 }
+                Err(_) => {}
             }
-            cleanup_text(val,  name);
         }
     }
+    println!("Data array: {:#?}", saga.len());
 }
 
-fn cleanup_text(mut info: String, file: String) {
-    let mut data_array: HashMap<String, String> = HashMap::new();
-    let mut link_array: Vec<String> = Vec::new();
+fn find_data_in_text_string(data: String, file: String) -> HashMap<String, String> {
+    let mut saga_info: HashMap<String, String> = HashMap::new();
     let mut total_of_season = 0;
-    let mut list_of_category: Vec<Category> = vec![];
-    let mut list_of_status: Vec<Status> = vec![];
-    let mut list_of_style: Vec<Saga_Style> = vec![];
+
     let name = cleanup_values(&file, ".pdf".to_string(), "")
         .trim()
         .to_string();
-    // Isolate wanted info by adding a $ at its beginning
-    info = find_wanted_key_in_text(info);
-    info = cleanup_values(&info, "\n\n".to_string(), "$");
-    info = cleanup_values(&info, "\n".to_string(), " ");
 
-    //get vec of data isolated using a dollar sign
-    let mut data = split_on_sign(&info, String::from("$"));
-    let synopsis = find_synopsis(&data);
+    let index = split_on_sign(&data, "$".to_string());
 
-    for element in data {
+    let synopsis = find_synopsis(&index);
+    saga_info.insert("Synopsis".to_string(), synopsis.trim().to_string());
+
+    for element in index {
         // If I found an URL
         match element.find("http") {
             None => {
-                // If there's : to split
                 let index = element.find(':');
-                //element.split(":");
                 match index {
-                    None => {},
+                    None => {}
                     Some(split_index) => {
                         let (split1, split2) = element.split_at(split_index);
                         let key = cleanup_values(split1, " ".to_string(), "");
                         let mut value = cleanup_values(split2, ": ".to_string(), "");
                         value = value.trim().to_owned();
-                        if split1.contains("Genre") {
-                            list_of_category =
-                                Category::insert_category_in_array(list_of_category, &value);
-                        }
-
-                        if split1.contains("Statut") {
-                            list_of_status = Status::insert_status_in_array(list_of_status, &value);
-                        }
-
-                        if split1.contains("Style") {
-                            list_of_style =
-                                Saga_Style::insert_style_in_array(list_of_style, &value);
-                        }
 
                         if split1.contains("Saison") {
                             total_of_season = total_of_season + 1;
                         } else {
-                            data_array.insert(key, value);
+                            saga_info.insert(key, value);
                         }
                     }
                 }
@@ -115,93 +202,52 @@ fn cleanup_text(mut info: String, file: String) {
         }
     }
 
-    data_array.insert("Season".to_string(), total_of_season.to_string());
-    data_array.insert("Synopsis".to_string(), synopsis.trim().to_string());
-    let saga = create_saga(
-        data_array,
-        list_of_category,
-        list_of_status,
-        list_of_style,
-        name,
-    );
+    saga_info.insert("Season".to_string(), total_of_season.to_string());
+    saga_info.insert("Name".to_string(), name);
+
+    saga_info
 }
 
-fn create_saga(
-    data_array: HashMap<String, String>,
-    category_array: Vec<Category>,
-    status_array: Vec<Status>,
-    list_of_style: Vec<Saga_Style>,
-    name: String,
-) -> Saga {
-    let mut saga: Saga = Saga::default();
-    saga.name = Some(name);
+
+fn create_saga(data_array: &HashMap<String, String>, name: String) -> NewSaga {
+    let mut saga: NewSaga = NewSaga::default();
+    saga.name = name;
     for (key, value) in data_array {
         match key.as_str() {
             "Auteur" => {
-                saga.author = Some(value);
+                saga.author = value.to_string();
             }
             "Musique" => {
-                saga.music = Some(value);
+                saga.music = value.to_string();
             }
-            "Origine" => {
-                let country = LIST_OF_COUNTRY.iter().find(|country| country.name == value);
-                match country {
-                    None => saga.country_of_origin = None,
-                    Some(country) => {
-                        saga.country_of_origin = Some(country.id);
-                    }
-                }
-            }
-            "Genre" => {
-                match category_array
-                    .iter()
-                    .find(|category| category.name == Some(value.to_string()))
-                {
-                    None => saga.category = None,
-                    Some(category) => {
-                        saga.category = Some(category.id);
-                    }
-                }
-            }
-            "Style" => {
-                match list_of_style
-                    .iter()
-                    .find(|style| style.name == value.to_string())
-                {
-                    None => saga.saga_type = None,
-                    Some(status) => {
-                        saga.saga_type = Some(status.id as i16);
-                    }
-                }
-            }
-            "Statut" => {
-                match status_array
-                    .iter()
-                    .find(|status| status.name == value.to_string())
-                {
-                    None => saga.status = None,
-                    Some(status) => {
-                        saga.status = Some(status.id as i16);
-                    }
-                }
-            }
+            "Origine" => match value.parse::<u32>() {
+                Ok(country_id) => saga.countryID = country_id,
+                Err(e) => panic!("No id found for country: {:#?}", e),
+            },
+            "Genre" => match value.parse::<u32>() {
+                Ok(category_id) => saga.categoryID = category_id,
+                Err(e) => panic!("No id found for category: {:#?}", e),
+            },
+            "Statut" => match value.parse::<u32>() {
+                Ok(status_id) => saga.statusID = status_id,
+                Err(e) => panic!("No id found for status: {:#?}", e),
+            },
             "Création" => {
-                saga.creation_date = Some(value);
+                saga.creation_date = value.to_string();
             }
             "Season" => {
-                saga.season = Some(value.parse::<i16>().unwrap_or(0));
+                saga.season = value.parse::<u16>().unwrap_or(0);
             }
             "Synopsis" => {
-                saga.description = Some(value);
+                saga.description = value.to_string();
             }
-            _ => {},
+            _ => {}
         }
     }
-
     saga
 }
 
-fn cleanup_values(mut text: &str, char: String, to: &str) -> String {
+fn cleanup_values(text: &str, char: String, to: &str) -> String {
     text.replace(&char, to)
 }
 
@@ -238,11 +284,11 @@ fn find_wanted_key_in_text(mut text: String) -> String {
 }
 
 fn split_on_sign(text: &str, sign: String) -> Vec<&str> {
-    let mut split_sections = text.split(&sign);
+    let split_sections = text.split(&sign);
     split_sections.collect::<Vec<&str>>()
 }
 
 // If the key exist in the text concatenate it with th $ sign
-fn detect_wanted_keys(mut text: &str, key: &str) -> String {
+fn detect_wanted_keys(text: &str, key: &str) -> String {
     text.replace(&key, &String::from("$".to_owned() + &key))
 }

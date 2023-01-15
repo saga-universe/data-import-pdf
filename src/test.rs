@@ -1,3 +1,7 @@
+use diesel::{insert_into, mysql::Mysql, debug_query};
+
+use crate::data::status::NewStatus;
+
 #[cfg(test)]
 use super::*;
 
@@ -63,4 +67,49 @@ fn it_shouldnt_find_the_synopsis_detail_nothing_come_after_the_key() {
     let text = vec!["azevr", "Synopsis"];
 
     assert_eq!("", find_synopsis(&text));
+}
+
+
+#[test]
+fn it_should_find_status_in_array() {
+    let array_status: Vec<FullStatus> = vec![
+        FullStatus {
+            id: 1,
+            name: "Abandonnée".to_string(),
+        },
+        FullStatus {
+            id: 2,
+            name: "Terminée".to_string(),
+        },
+    ];
+
+    assert_eq!("1", Status::find_status_in_array(&array_status, "Abandonnée"));
+}
+
+#[test]
+fn examine_sql_from_insertable_status_struct_batch() {
+    use schema::status::dsl::*;
+    let status_array: [NewStatus; 5] = [
+        NewStatus {
+            name: "Abandonnée",
+        },
+        NewStatus {
+            name: "Terminée",
+        },
+        NewStatus {
+            name: "En cours",
+        },
+        NewStatus {
+            name: "Pris de cours",
+        },
+        NewStatus {
+            name: "Jadis",
+        },
+    ];
+    
+    let query = insert_into(status).values(&status_array);
+    let sql = "INSERT INTO `status` (`name`) \
+               VALUES (?), (?), (?), (?), (?) \
+               -- binds: [\"Abandonnée\", \"Terminée\", \"En cours\", \"Pris de cours\", \"Jadis\"]";
+    assert_eq!(sql, debug_query::<Mysql, _>(&query).to_string());
 }

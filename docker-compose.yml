@@ -40,6 +40,7 @@ services:
           - mariadb104.devEnv.local
     volumes:
       - ${MYSQL_FOLDER_PATH}:/var/lib/mysql
+      - ${MYSQL_CONFIG_PATH}:/etc/mysql/my.cnf
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}

@@ -1,0 +1,1 @@
+DROP TABLE sagas_subcategories;
